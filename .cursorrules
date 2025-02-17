@@ -98,155 +98,385 @@ If needed, you can further use the `web_scraper.py` file to scrape the web page 
 - Need to modify prompts to work with Gemini's response format
 - Consider creating wrapper/adapter for consistent API across different LLM providers
 
-## Current Task: Gemini Integration
+## Current Task: Integrated Room Design & Shopping System
 
-### Progress
-[X] Initial setup
-  - Added @google/generative-ai package
-  - Created LLM config file
+### Workflow Analysis (Interior Designer + Construction Perspective)
 
-[✓] Attempted changes:
-  - verify-general.ts: Updated to use new response format ✓
-  - verify-github.ts: Needs update for LLMResponse
-  - verify-youtube.ts: Needs update for LLMResponse
-  - validate-bulk-tweets.ts: Updated to use new response format ✓
+1. Design Phase (Replicate AI):
+   - Takes user's room photo
+   - Applies design style
+   - Generates redesigned space
+   - Acts like initial design mockup
 
-[!] Files to Update (HIGH PRIORITY):
-  1. Response Format Updates Needed:
-     - src/agents/shared/nodes/verify-github.ts
-       - Change { relevant } = await to response.parsed?.relevant
-     - src/agents/shared/nodes/verify-youtube.ts
-       - Change { relevant } = await to response.parsed?.relevant
-     - src/agents/supervisor/nodes/determine-post-type.ts
-       - Fix type mismatch in reportAndPostType.push()
-     - src/agents/shared/nodes/update-scheduled-date.ts
-       - Change result.scheduleDate to result.parsed?.scheduleDate
-     - src/agents/generate-thread/nodes/rewrite-thread.ts
-       - Change revisedThreadResponse.threadPosts to revisedThreadResponse.parsed?.threadPosts
-     - src/agents/verify-reddit-post/nodes/validate-reddit-post.ts
-       - Change result.relevant to result.parsed?.relevant
-     - src/agents/verify-tweet/nodes/validate-tweet.ts
-       - Change { relevant } = await to response.parsed?.relevant
-     - src/agents/generate-thread/nodes/generate-thread-posts.ts
-       - Fix message format from [["user", msg]] to [{role: "user", content: msg}]
+2. Analysis Phase (Gemini Vision):
+   - Like an interior designer analyzing the space
+   - Identifies key elements:
+     ```typescript
+     interface RoomAnalysis {
+         structural: {
+             walls: string[];      // "exposed brick", "painted drywall"
+             flooring: string[];   // "hardwood", "tile"
+             windows: string[];    // "floor-to-ceiling", "bay window"
+         };
+         furniture: {
+             type: string;         // "sectional sofa", "dining table"
+             style: string[];      // "mid-century modern", "industrial"
+             materials: string[];  // "leather", "reclaimed wood"
+             dimensions: string;   // "approximate size/space needed"
+         }[];
+         decor: {
+             lighting: string[];   // "pendant lights", "floor lamps"
+             accessories: string[];// "wall art", "throw pillows"
+             colors: string[];     // "navy blue", "brushed brass"
+         };
+     }
+     ```
 
-  2. Type Updates Needed:
-     - src/config/llm-adapter.ts
-       - Fix ChatAnthropic type issues in withStructuredOutput and withConfig
-     - src/config/llm-adapter.test.ts
-       - Update test assertions to use response.parsed
+3. Shopping Phase (Google Shopping API):
+   ```typescript
+   interface ProductSearch {
+       endpoint: string;  // "search" or "search-v2"
+       parameters: {
+           keyword: string;      // Generated from analysis
+           price_min?: number;
+           price_max?: number;
+           gl?: string;         // Country code
+           filter_by?: string[];// "Free shipping", "On sale"
+       };
+   }
+   ```
+
+### Integration Flow
+
+1. Room Generation:
+```javascript
+// 1. Generate new design
+const newDesign = await replicate.run(model, {
+    image: originalRoom,
+    prompt: designPrompt
+});
+
+// 2. Analyze generated design
+const analysis = await gemini.analyzeImage({
+    image: newDesign,
+    roomType,
+    designStyle
+});
+
+// 3. Generate shopping recommendations
+const recommendations = await Promise.all(
+    analysis.furniture.map(item => 
+        googleShopping.search({
+            keyword: `${item.style[0]} ${item.type} ${item.materials[0]}`,
+            gl: 'us',
+            price_range: userPriceRange
+        })
+    )
+);
+```
+
+2. Response Structure:
+```typescript
+interface DesignResponse {
+    design: {
+        original: string;    // Original room URL
+        generated: string;   // AI generated room URL
+    };
+    analysis: {
+        structural: any[];   // Construction considerations
+        furniture: any[];    // Furniture recommendations
+        decor: any[];       // Decor elements
+    };
+    shopping: {
+        furniture: Product[];
+        decor: Product[];
+        materials: Product[];
+    };
+}
+```
+
+### Implementation Phases
+
+#### Phase 1: Core Integration [Current Focus]
+[X] Setup Replicate room generation
+[ ] Implement Gemini Vision analysis
+[ ] Configure Google Shopping API
+[ ] Create unified response structure
+
+#### Phase 2: Enhanced Analysis
+[ ] Structural element detection
+[ ] Material recommendations
+[ ] Size/dimension estimation
+[ ] Style consistency validation
+
+#### Phase 3: Shopping Integration
+[ ] Product category mapping
+[ ] Price range optimization
+[ ] Availability checking
+[ ] Regional store filtering
+
+#### Phase 4: UI/UX Development
+[ ] Split-view comparison
+[ ] Product overlay on image
+[ ] Material/finish selector
+[ ] Budget calculator
+
+### Technical Considerations
+
+1. API Coordination:
+   - Sequential processing
+   - Error handling between services
+   - Response caching
+   - Rate limit management
+
+2. Data Structure:
+   - Consistent format across services
+   - Flexible enough for different room types
+   - Structured for easy UI rendering
+
+3. Performance:
+   - Parallel product searches
+   - Progressive loading
+   - Image optimization
+   - Cache frequently requested items
 
 ### Next Steps
-[X] Create LLM adapter/wrapper for consistent API
-[!] Fix Response Format Issues:
-  1. [✓] Create proper LLMResponse interface
-  2. [✓] Update verify-general.ts as example
-  3. [✓] Update validate-bulk-tweets.ts as example
-  4. [ ] Update remaining files following the pattern
-  5. [ ] Add null coalescing for safety
+1. [ ] Create unified API handler
+2. [ ] Implement analysis pipeline
+3. [ ] Setup shopping integration
+4. [ ] Design response structure
 
-[ ] Testing:
-  1. [ ] Add unit tests for adapter
-  2. [ ] Test response parsing
-  3. [ ] Test error handling
-  4. [ ] Integration tests with both providers
-
-### Technical Notes
-1. Response Format Pattern:
-   - Always use response.parsed for structured data
-   - Add null coalescing (e.g., response.parsed?.relevant ?? false)
-   - Keep raw response in response.content
-
-2. Message Format:
-   - Old: [["user", message]]
-   - New: [{ role: "user", content: message }]
-
-3. Type Safety:
-   - Use LLMResponse<T> for all responses
-   - Add proper error handling for missing parsed data
-   - Use type guards where needed
-
-## Cursor learned
-
-- For search results, ensure proper handling of different character encodings (UTF-8) for international queries
-- Add debug information to stderr while keeping the main output clean in stdout for better pipeline integration
-- When using seaborn styles in matplotlib, use 'seaborn-v0_8' instead of 'seaborn' as the style name due to recent seaborn version changes
-- Use 'gpt-4o' as the model name for OpenAI's GPT-4 with vision capabilities
+Would you like me to start implementing any specific component?
 
 # Scratchpad
 
-## Current Task
-Implementing DeepSeek with Hyperbolic Fallback Integration
+## Current Task Review
+Implementing Guest/Trial Mode for AI Room Design Application
 
-## Analysis
-1. Current Setup:
-   - Primary DeepSeek API integration needed in tools/llm_api.py
-   - Fallback Hyperbolic API as backup
-   - Python-based implementation required
-   - Environment variables need configuration
+## Current State Analysis
+1. Core Files Reviewed:
+   - app/dashboard/create-new/page.jsx: Main image generation logic
+   - app/dashboard/_components/Header.jsx: Navigation and user interface
+   - app/page.js: Landing page
+   - app/api/verify-user/route.jsx: User verification
+   - config/schema.js: Database schema
 
-2. Required Changes:
-   - Add DeepSeek provider to tools/llm_api.py
-   - Implement fallback logic in Python
-   - Add error handling and monitoring
-   - Update provider selection logic
+2. Current Authentication Flow:
+   - Uses Clerk for authentication
+   - All routes require authentication
+   - Credits system tied to user accounts
+   - Image generation requires user email
 
-## Implementation Plan
+3. Key Dependencies:
+   - Firebase for image storage
+   - Replicate for AI generation
+   - Clerk for auth
+   - Drizzle ORM for database
 
-### Phase 1: Environment & Configuration [X]
-- [X] Review current tools/llm_api.py implementation
-- [X] Identify integration points for DeepSeek
-- [X] Plan environment variables needed
+## Implementation Challenges & Considerations
+1. Data Storage:
+   - Need separate storage for guest generations
+   - Must implement expiration for guest data
+   - Consider storage limits for guests
 
-### Phase 2: Provider Implementation [ ]
-1. [ ] Add DeepSeek Provider
-   - [ ] Create tools/providers/deepseek.py
-   - [ ] Implement API client
-   - [ ] Add configuration handling
+2. Security:
+   - Prevent abuse of guest system
+   - Rate limiting for guest requests
+   - Secure session management
 
-2. [ ] Add Fallback Logic
-   - [ ] Implement Hyperbolic fallback
-   - [ ] Add error handling
-   - [ ] Configure retry logic
+3. User Experience:
+   - Clear trial limitations
+   - Smooth upgrade path
+   - Persistent guest session across pages
 
-### Phase 3: Integration [ ]
-1. [ ] Update tools/llm_api.py
-   - [ ] Add provider selection
-   - [ ] Integrate fallback mechanism
-   - [ ] Add monitoring
+## Revised Implementation Plan
 
-### Phase 4: Testing [ ]
-1. [ ] Unit Tests
-   - [ ] Test DeepSeek integration
-   - [ ] Test fallback scenarios
-   - [ ] Verify error handling
+### Phase 1: Database & Schema [Priority]
+1. [ ] Add GuestGeneratedImage table
+   - Session tracking
+   - Expiration handling
+   - Usage limits
 
-2. [ ] Integration Tests
-   - [ ] End-to-end testing
-   - [ ] Performance monitoring
-   - [ ] Error recovery
+2. [ ] Update existing routes
+   - Handle guest sessions
+   - Implement usage checks
+   - Add error handling
 
-## Progress
-[X] Initial Analysis
-  - Reviewed existing implementation
-  - Identified integration points
-  - Planned implementation approach
+### Phase 2: Guest Session Management
+1. [ ] Create guest session system
+   - Local storage based
+   - 24hr expiration
+   - Usage tracking
 
-[ ] Provider Implementation
-  - Starting with DeepSeek provider
-  - Will add fallback logic next
-  - Need to implement monitoring
+2. [ ] Update middleware
+   - Allow guest routes
+   - Implement rate limiting
+   - Handle auth bypassing
+
+### Phase 3: UI Components
+1. [ ] Update Header
+   - Add trial mode indicator
+   - Show remaining generations
+   - Add upgrade prompts
+
+2. [ ] Modify Create New page
+   - Handle guest flow
+   - Show limitations
+   - Add conversion CTAs
+
+### Phase 4: API Routes
+1. [ ] Update redesign-room
+   - Handle guest requests
+   - Implement limits
+   - Store guest results
+
+2. [ ] Modify verify-user
+   - Add guest verification
+   - Track usage
+   - Handle upgrades
 
 ## Technical Notes
-- Implementation must be in Python
-- Need to follow existing provider pattern in tools/llm_api.py
-- Consider adding metrics for monitoring
-- Implement proper error handling
+1. Session Management:
+   - Use localStorage for guest session
+   - Implement session cleanup
+   - Track usage count
 
-## Next Steps
-1. Create DeepSeek provider implementation
-2. Add fallback mechanism
-3. Update main LLM interface
-4. Add comprehensive testing
+2. Database Considerations:
+   - Regular cleanup of expired guest data
+   - Index on sessionId and expiresAt
+   - Optimize queries for guest checks
 
-Would you like me to proceed with implementing the DeepSeek provider in Python?
+3. Security Measures:
+   - Rate limit by IP
+   - Validate guest tokens
+   - Prevent session manipulation
+
+## Progress Tracking
+[X] Initial Analysis
+  - Reviewed core files
+  - Identified key changes
+  - Listed dependencies
+
+[ ] Schema Updates
+  - Design guest table
+  - Plan migrations
+  - Update queries
+
+[ ] Session Implementation
+  - Design session structure
+  - Plan storage strategy
+  - Define limitations
+
+## Lessons Learned
+- Keep guest functionality separate from user functionality
+- Implement proper cleanup for guest data
+- Consider rate limiting from the start
+- Design clear upgrade paths
+
+Would you like me to proceed with implementing any specific phase of this revised plan?
+
+## Current Priority: Debug Gemini Analysis Integration
+
+### Latest Error Analysis (2024-02-17)
+Problem: Analysis still failing with 500 status despite successful image access
+
+#### Current Flow Verification
+1. Image Generation ✅
+   - Replicate generates image successfully
+   - Firebase stores image successfully
+   - URL is accessible (confirmed via curl)
+
+2. Analysis Attempt ❌
+   - Request reaches analyze-room endpoint
+   - 500 error returned
+   - No detailed error logs visible
+
+#### Debug Hypothesis
+1. Base64 Encoding Issues
+   ```javascript
+   // Current
+   const base64Image = Buffer.from(imageResponse.data).toString('base64');
+   
+   // Potential fixes to try:
+   // 1. Add data URI prefix
+   const base64WithPrefix = `data:image/jpeg;base64,${base64Image}`;
+   
+   // 2. Use FileReader API
+   const blob = new Blob([imageResponse.data], { type: 'image/jpeg' });
+   const reader = new FileReader();
+   reader.readAsDataURL(blob);
+   ```
+
+2. Request Format Issues
+   ```javascript
+   // Current
+   {
+       inlineData: {
+           mimeType: 'image/jpeg',
+           data: base64Image
+       }
+   }
+   
+   // Alternative to try
+   {
+       parts: [{
+           text: prompt
+       }, {
+           inlineData: {
+               mimeType: 'image/jpeg',
+               data: base64Image
+           }
+       }]
+   }
+   ```
+
+#### Next Debug Steps [Priority Order]
+1. [ ] Add verbose error logging
+   ```javascript
+   // In analyze-room/route.jsx
+   console.error('Full error details:', {
+       error: error.message,
+       stack: error.stack,
+       response: error.response?.data,
+       status: error.response?.status,
+       headers: error.response?.headers
+   });
+   ```
+
+2. [ ] Test with minimal prompt
+   ```javascript
+   // Simplify prompt to rule out parsing issues
+   const simplePrompt = "Describe what you see in this image";
+   ```
+
+3. [ ] Verify Gemini API limits
+   - Check base64 size limits
+   - Verify API quota
+   - Test rate limiting
+
+4. [ ] Add request validation
+   ```javascript
+   // Before sending to Gemini
+   console.log('Request payload:', {
+       promptLength: prompt.length,
+       base64Length: base64Image.length,
+       mimeType: 'image/jpeg'
+   });
+   ```
+
+#### Questions to Investigate
+1. Is the error from Gemini API or our processing?
+2. Are we hitting any size/format limitations?
+3. Is the prompt format causing issues?
+4. Are we handling the response stream correctly?
+
+#### Action Items
+1. [ ] Implement detailed error logging
+2. [ ] Test with simplified prompt
+3. [ ] Add request validation
+4. [ ] Test with different image sizes
+5. [ ] Verify Gemini API quotas
+
+Would you like me to implement any of these debug steps?
+
+[Previous notes remain below...]

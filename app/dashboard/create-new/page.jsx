@@ -17,55 +17,89 @@ import { UserDetailContext } from '@/app/_context/UserDetailContext'
 
 function CreateNew() {
 
-  const {user}=useUser();
+  const {user} = useUser();
   const [formData,setFormData]=useState([]);
   const [loading,setLoading]=useState(false);
   const [aiOutputImage,setAiOutputImage]=useState()
   const [openOutputDialog,setOpenOutputDialog]=useState(false);
   const [orgImage,setOrgImage]=useState();
   const {userDetail,setUserDetail}=useContext(UserDetailContext);
-  // const [outputResult,setOutputResult]=useState();
+  const [error, setError] = useState(null);
+
   const onHandleInputChange=(value,fieldName)=>{
+    if (fieldName === 'image') {
+      console.log('Selected image:', value);
+    }
     setFormData(prev=>({
       ...prev,
       [fieldName]:value
     }))
-
-    console.log(formData);
+    console.log('Updated formData:', formData);
   }
 
   const GenerateAiImage=async()=>{
-    setLoading(true);
-    const rawImageUrl=await SaveRawImageToFirebase();
-    const result=await axios.post('/api/redesign-room',{
-      imageUrl:rawImageUrl,
-      roomType:formData?.roomType,
-      designType:formData?.designType,
-      additionalReq:formData?.additionalReq,
-      userEmail:user?.primaryEmailAddress?.emailAddress
-    });
-    console.log(result.data);
-    setAiOutputImage(result.data.result);// Output Image Url
-    await updateUserCredits();
+    try {
+      setLoading(true);
+      setError(null);
 
-    setOpenOutputDialog(true);
-   
-    setLoading(false);
+      if (!formData.image || !formData.roomType || !formData.designType) {
+        throw new Error('Please select an image, room type, and design type');
+      }
 
+      console.log('Uploading image to Firebase...');
+      const rawImageUrl = await SaveRawImageToFirebase();
+      
+      console.log('Starting room generation process...');
+      const response = await axios.post('/api/redesign-room', {
+        imageUrl: rawImageUrl,
+        roomType: formData.roomType,
+        designType: formData.designType,
+        additionalReq: formData.additionalReq || '',
+        userEmail: user?.emailAddresses[0]?.emailAddress || 'guest'
+      });
+
+      console.log('Room generation response:', response.data);
+
+      if (response.data.error) {
+        throw new Error(response.data.error);
+      }
+
+      setAiOutputImage(response.data.result);
+      
+      // Check if we got analysis data
+      if (response.data.analysis) {
+        console.log('Received room analysis:', response.data.analysis);
+        // Handle the analysis data here
+      } else {
+        console.log('No analysis data received');
+      }
+
+      if (user) {
+        await updateUserCredits();
+      }
+
+      setOpenOutputDialog(true);
+    } catch (error) {
+      console.error('Error generating image:', error);
+      setError(error.message || 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
   }
 
   const SaveRawImageToFirebase=async()=>{
+    console.log('Starting Firebase upload with image:', formData.image);
     // Save Raw File Image to Firebase 
     const fileName=Date.now()+"_raw.png";
     const imageRef=ref(storage,'room-redesign/'+fileName);
 
     await uploadBytes(imageRef,formData.image).then(resp=>{
-      console.log('File Uploaded...')
+      console.log('File Upload response:', resp);
     })
     
     // Uploaded File Image URL
     const downloadUrl=await getDownloadURL(imageRef);
-    console.log(downloadUrl);
+    console.log('Firebase download URL:', downloadUrl);
     setOrgImage(downloadUrl);
     return downloadUrl;
 

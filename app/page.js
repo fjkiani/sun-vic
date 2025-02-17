@@ -40,14 +40,21 @@ and Home
 
    
     <div className="mt-8 gap-3 flex justify-center">
-      <a className="inline-flex justify-center items-center 
-      gap-x-3 text-center bg-gradient-to-tl from-blue-600
-       to-violet-600 hover:from-violet-600 hover:to-blue-600 border border-transparent text-white text-sm font-medium rounded-md focus:outline-none focus:ring-1 focus:ring-gray-600 py-3 px-4 dark:focus:ring-offset-gray-800" 
-       href="/dashboard">
+      <Link 
+        href="/dashboard"
+        className="inline-flex justify-center items-center gap-x-3 text-center bg-gradient-to-tl from-blue-600 to-violet-600 hover:from-violet-600 hover:to-blue-600 border border-transparent text-white text-sm font-medium rounded-md focus:outline-none focus:ring-1 focus:ring-gray-600 py-3 px-4 dark:focus:ring-offset-gray-800"
+      >
         Get started
         <svg className="flex-shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-      </a>
-     
+      </Link>
+
+      <Link
+        href="/dashboard/create-new"
+        className="inline-flex justify-center items-center gap-x-3 text-center bg-white hover:bg-gray-100 border border-gray-300 text-gray-800 text-sm font-medium rounded-md py-3 px-4"
+      >
+        Try it out
+        <svg className="flex-shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </Link>
     </div>
    
 

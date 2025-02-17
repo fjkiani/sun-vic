@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@clerk/nextjs": "^5.7.5",
+    "@clerk/nextjs": "^4.29.9",
     "@neondatabase/serverless": "^0.10.1",
     "@paypal/react-paypal-js": "^8.7.0",
     "@radix-ui/react-alert-dialog": "^1.1.2",
