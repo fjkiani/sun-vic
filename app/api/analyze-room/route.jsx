@@ -14,136 +14,97 @@ const generationConfig = {
 };
 
 export async function POST(req) {
+    console.log('analyze-room endpoint hit');
+    
     try {
-        console.log('Starting Gemini analysis process...');
         const { imageUrl, roomType, designType } = await req.json();
+        console.log('Request received:', { roomType, designType });
+
+        const model = genAI.getGenerativeModel({
+            model: "gemini-2.0-flash-thinking-exp-01-21",
+            generationConfig
+        });
+
+        // Fetch image
+        const imageResponse = await axios.get(imageUrl, { 
+            responseType: 'arraybuffer' 
+        });
         
-        if (!imageUrl || !roomType || !designType) {
-            throw new Error('Missing required fields');
+        const base64Image = Buffer.from(imageResponse.data).toString('base64');
+        
+        // Even more explicit prompt about format
+        const prompt = `Analyze this ${roomType} designed in ${designType} style.
+        IMPORTANT: Return ONLY a raw JSON object with no markdown formatting, no backticks, and no code block indicators.
+        Use exactly this format:
+        {
+            "furniture": [
+                {
+                    "type": "string",
+                    "style": ["string"],
+                    "materials": ["string"],
+                    "colors": ["string"],
+                    "dimensions": "string",
+                    "searchTerms": ["string"]
+                }
+            ],
+            "decor": [
+                {
+                    "type": "string",
+                    "style": ["string"],
+                    "colors": ["string"],
+                    "searchTerms": ["string"]
+                }
+            ],
+            "structural": {
+                "walls": ["string"],
+                "flooring": ["string"],
+                "windows": ["string"]
+            }
         }
 
-        console.log('Analysis request for:', { roomType, designType });
-        console.log('Image URL:', imageUrl);
+        DO NOT include any text before or after the JSON. DO NOT use markdown formatting.`;
 
-        // Fetch the image first to ensure we have access
-        console.log('Fetching image...');
-        try {
-            const imageResponse = await axios.get(imageUrl, {
-                responseType: 'arraybuffer'
-            });
-
-            console.log('Image fetch details:', {
-                size: imageResponse.data.length,
-                contentType: imageResponse.headers['content-type'],
-                status: imageResponse.status,
-                headers: imageResponse.headers
-            });
-
-            // Convert to base64
-            const base64Image = Buffer.from(imageResponse.data).toString('base64');
-            console.log('Base64 conversion details:', {
-                originalSize: imageResponse.data.length,
-                base64Length: base64Image.length,
-                base64Preview: base64Image.substring(0, 50) + '...'
-            });
-
-            // Initialize model
-            const model = genAI.getGenerativeModel({ 
-                model: "gemini-pro-vision"
-            });
-
-            // Create structured prompt
-            const prompt = `Analyze this ${roomType} image designed in ${designType} style. 
-            Focus on identifying specific items that could be purchased to recreate this look.
-            Provide a detailed analysis in the following JSON structure:
+        const result = await model.generateContent([
+            prompt,
             {
-                "furniture": [
-                    {
-                        "type": "specific item name",
-                        "style": ["specific style descriptors"],
-                        "materials": ["specific materials"],
-                        "colors": ["specific colors"],
-                        "dimensions": "approximate size",
-                        "searchTerms": ["suggested shopping search terms"]
-                    }
-                ],
-                "decor": [
-                    {
-                        "type": "specific item name",
-                        "style": ["specific style descriptors"],
-                        "colors": ["specific colors"],
-                        "searchTerms": ["suggested shopping search terms"]
-                    }
-                ],
-                "structural": {
-                    "walls": ["specific wall treatments"],
-                    "flooring": ["specific flooring types"],
-                    "windows": ["specific window styles"]
+                inlineData: {
+                    mimeType: 'image/jpeg',
+                    data: base64Image
                 }
-            }`;
-
-            // Log request details before sending
-            console.log('Gemini request details:', {
-                model: "gemini-pro-vision",
-                promptLength: prompt.length,
-                imageSize: base64Image.length,
-                mimeType: imageResponse.headers['content-type'] || 'image/jpeg'
-            });
-
-            // Send to Gemini
-            try {
-                const result = await model.generateContent([
-                    prompt,
-                    {
-                        inlineData: {
-                            mimeType: 'image/jpeg',
-                            data: base64Image
-                        }
-                    }
-                ]);
-
-                const response = await result.response;
-                console.log('Gemini response received:', {
-                    responseLength: response.text().length,
-                    preview: response.text().substring(0, 100) + '...'
-                });
-
-                try {
-                    const analysis = JSON.parse(response.text());
-                    console.log('Response parsed successfully');
-                    return NextResponse.json({ analysis });
-                } catch (parseError) {
-                    console.error('Parse error:', {
-                        error: parseError.message,
-                        responseText: response.text()
-                    });
-                    throw new Error('Failed to parse Gemini response: ' + parseError.message);
-                }
-            } catch (geminiError) {
-                console.error('Gemini API error:', {
-                    message: geminiError.message,
-                    stack: geminiError.stack,
-                    details: geminiError.details || 'No additional details'
-                });
-                throw new Error('Gemini API error: ' + geminiError.message);
             }
-        } catch (fetchError) {
-            console.error('Image fetch error:', {
-                message: fetchError.message,
-                status: fetchError.response?.status,
-                statusText: fetchError.response?.statusText,
-                headers: fetchError.response?.headers
+        ]);
+
+        const response = await result.response;
+        const rawText = response.text();
+        
+        // Log the raw response to see what we're getting
+        console.log('Raw Gemini response:', rawText);
+
+        try {
+            // More thorough cleaning of the response
+            const cleanedText = rawText
+                .replace(/^```json\s*/g, '')     // Remove leading ```json
+                .replace(/\s*```$/g, '')         // Remove trailing ```
+                .replace(/^```\s*/g, '')         // Remove other code block starts
+                .replace(/^{/m, '{')             // Ensure clean JSON start
+                .replace(/}$/m, '}')             // Ensure clean JSON end
+                .trim();                         // Remove extra whitespace
+            
+            console.log('Cleaned response:', cleanedText);
+            
+            const analysis = JSON.parse(cleanedText);
+            return NextResponse.json({ analysis });
+        } catch (parseError) {
+            console.error('Parse error. Raw response:', {
+                rawResponse: rawText,
+                error: parseError.message
             });
-            throw new Error('Failed to fetch image: ' + fetchError.message);
+            throw new Error(`Failed to parse Gemini response: ${parseError.message}`);
         }
     } catch (error) {
         console.error('Analysis error:', {
-            phase: error.phase || 'unknown',
             message: error.message,
-            stack: error.stack,
-            response: error.response?.data,
-            status: error.response?.status,
-            headers: error.response?.headers
+            rawError: error
         });
         return NextResponse.json({ 
             error: error.message,

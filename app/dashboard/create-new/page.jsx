@@ -64,14 +64,22 @@ function CreateNew() {
         throw new Error(response.data.error);
       }
 
-      setAiOutputImage(response.data.result);
-      
-      // Check if we got analysis data
-      if (response.data.analysis) {
-        console.log('Received room analysis:', response.data.analysis);
-        // Handle the analysis data here
-      } else {
-        console.log('No analysis data received');
+      // Store the generated image URL
+      const generatedImageUrl = response.data.result;
+      setAiOutputImage(generatedImageUrl);
+
+      // Now call the analyze function with the generated image
+      console.log('Starting analysis of generated image...');
+      try {
+        const analysisResult = await analyzeGeneratedImage(
+          generatedImageUrl,
+          formData.roomType,
+          formData.designType
+        );
+        console.log('Analysis completed:', analysisResult);
+      } catch (analysisError) {
+        console.error('Analysis failed:', analysisError);
+        // Don't throw here - we still want to show the generated image
       }
 
       if (user) {
@@ -124,6 +132,44 @@ function CreateNew() {
         return result[0].id
     }
   }
+
+  const analyzeGeneratedImage = async (firebaseUrl, roomType, designType) => {
+    console.log('Starting analysis with:', {
+        url: firebaseUrl,
+        roomType,
+        designType
+    });
+
+    try {
+        const response = await fetch('/api/analyze-room', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                imageUrl: firebaseUrl,
+                roomType,
+                designType
+            })
+        });
+
+        console.log('Analysis response status:', response.status);
+        const data = await response.json();
+        console.log('Analysis response data:', data);
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Analysis failed');
+        }
+
+        return data.analysis;
+    } catch (error) {
+        console.error('Analysis error details:', {
+            message: error.message,
+            stack: error.stack
+        });
+        throw new Error('Analysis failed with status: ' + error.message);
+    }
+  };
 
   return (
     <div>

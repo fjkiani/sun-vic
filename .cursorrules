@@ -377,106 +377,96 @@ Would you like me to proceed with implementing any specific phase of this revise
 
 ## Current Priority: Debug Gemini Analysis Integration
 
-### Latest Error Analysis (2024-02-17)
-Problem: Analysis still failing with 500 status despite successful image access
+### Environment Configuration Issue Found
+Problem: Duplicate .env files causing environment variable loading issues
 
-#### Current Flow Verification
-1. Image Generation ✅
-   - Replicate generates image successfully
-   - Firebase stores image successfully
-   - URL is accessible (confirmed via curl)
-
-2. Analysis Attempt ❌
-   - Request reaches analyze-room endpoint
-   - 500 error returned
-   - No detailed error logs visible
-
-#### Debug Hypothesis
-1. Base64 Encoding Issues
-   ```javascript
-   // Current
-   const base64Image = Buffer.from(imageResponse.data).toString('base64');
+#### Current State
+1. Environment Files:
+   ```
+   Root directory:
+   .env:
+   - Has GEMINI_API_KEY=AIzaSyAorPf23l6IMOuKLeNUNQsd5zRshC-j7gQ
    
-   // Potential fixes to try:
-   // 1. Add data URI prefix
-   const base64WithPrefix = `data:image/jpeg;base64,${base64Image}`;
-   
-   // 2. Use FileReader API
-   const blob = new Blob([imageResponse.data], { type: 'image/jpeg' });
-   const reader = new FileReader();
-   reader.readAsDataURL(blob);
+   app/.env:
+   - Missing GEMINI_API_KEY
+   - Has other configurations
    ```
 
-2. Request Format Issues
-   ```javascript
-   // Current
-   {
-       inlineData: {
-           mimeType: 'image/jpeg',
-           data: base64Image
-       }
-   }
-   
-   // Alternative to try
-   {
-       parts: [{
-           text: prompt
-       }, {
-           inlineData: {
-               mimeType: 'image/jpeg',
-               data: base64Image
-           }
-       }]
-   }
-   ```
+2. Issue:
+   - Next.js might not be loading the root .env file
+   - Environment variables might be undefined in API routes
+   - Multiple .env files can cause confusion
 
-#### Next Debug Steps [Priority Order]
-1. [ ] Add verbose error logging
-   ```javascript
-   // In analyze-room/route.jsx
-   console.error('Full error details:', {
-       error: error.message,
-       stack: error.stack,
-       response: error.response?.data,
-       status: error.response?.status,
-       headers: error.response?.headers
-   });
-   ```
+#### Immediate Actions [Priority]
+1. [ ] Consolidate Environment Files
+```bash
+# 1. Merge app/.env into root .env
+# 2. Remove app/.env
+# 3. Verify all required variables are in root .env:
+NEXT_PUBLIC_DATABSE_URL=postgresql://...
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+REPLICATE_API_TOKEN=r8_...
+NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyD6N...
+GEMINI_API_KEY=AIzaSyAorPf...
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
+```
 
-2. [ ] Test with minimal prompt
-   ```javascript
-   // Simplify prompt to rule out parsing issues
-   const simplePrompt = "Describe what you see in this image";
-   ```
+2. [ ] Add Environment Validation
+```javascript
+// Add to analyze-room/route.jsx
+const validateEnvironment = () => {
+    const required = ['GEMINI_API_KEY'];
+    const missing = required.filter(key => !process.env[key]);
+    
+    if (missing.length > 0) {
+        console.error('Missing environment variables:', missing);
+        throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+    }
+    
+    console.log('Environment validation:', {
+        geminiKeyPresent: !!process.env.GEMINI_API_KEY,
+        keyLength: process.env.GEMINI_API_KEY?.length
+    });
+};
+```
 
-3. [ ] Verify Gemini API limits
-   - Check base64 size limits
-   - Verify API quota
-   - Test rate limiting
+3. [ ] Update API Route
+```javascript
+// In analyze-room/route.jsx
+export async function POST(req) {
+    try {
+        // Add environment validation
+        validateEnvironment();
+        
+        console.log('Environment check:', {
+            geminiKeyPresent: !!process.env.GEMINI_API_KEY,
+            baseUrl: process.env.NEXT_PUBLIC_BASE_URL
+        });
+        
+        // ... rest of the code
+    } catch (error) {
+        console.error('Analysis error:', {
+            message: error.message,
+            envError: error.message.includes('environment')
+        });
+        return NextResponse.json({ 
+            error: error.message 
+        }, { 
+            status: 500 
+        });
+    }
+}
+```
 
-4. [ ] Add request validation
-   ```javascript
-   // Before sending to Gemini
-   console.log('Request payload:', {
-       promptLength: prompt.length,
-       base64Length: base64Image.length,
-       mimeType: 'image/jpeg'
-   });
-   ```
+#### Next Steps
+1. [ ] Merge environment files
+2. [ ] Add environment validation
+3. [ ] Restart Next.js server
+4. [ ] Test Gemini integration again
 
-#### Questions to Investigate
-1. Is the error from Gemini API or our processing?
-2. Are we hitting any size/format limitations?
-3. Is the prompt format causing issues?
-4. Are we handling the response stream correctly?
-
-#### Action Items
-1. [ ] Implement detailed error logging
-2. [ ] Test with simplified prompt
-3. [ ] Add request validation
-4. [ ] Test with different image sizes
-5. [ ] Verify Gemini API quotas
-
-Would you like me to implement any of these debug steps?
+Would you like me to implement these changes?
 
 [Previous notes remain below...]
