@@ -375,98 +375,147 @@ Implementing Guest/Trial Mode for AI Room Design Application
 
 Would you like me to proceed with implementing any specific phase of this revised plan?
 
-## Current Priority: Debug Gemini Analysis Integration
+## Current Priority: Shopping Integration with Gemini Analysis
 
-### Environment Configuration Issue Found
-Problem: Duplicate .env files causing environment variable loading issues
+### Current State
+1. ✅ Image Generation (Replicate)
+2. ✅ Basic Analysis (Gemini)
+3. ❌ Shopping Integration
 
-#### Current State
-1. Environment Files:
-   ```
-   Root directory:
-   .env:
-   - Has GEMINI_API_KEY=AIzaSyAorPf23l6IMOuKLeNUNQsd5zRshC-j7gQ
-   
-   app/.env:
-   - Missing GEMINI_API_KEY
-   - Has other configurations
-   ```
+### Required Enhancements
+1. Gemini Prompt Engineering
+```javascript
+// Current prompt is too generic. Need to focus on:
+const shoppingFocusedPrompt = `
+As a professional interior designer and shopping expert, analyze this ${roomType} designed in ${designType} style.
+For each item in the room:
+1. Identify exact product types and variations
+2. Specify detailed materials and finishes
+3. Provide precise dimensions or size ranges
+4. Include brand references or similar product lines
+5. Add specific shopping keywords for each item
 
-2. Issue:
-   - Next.js might not be loading the root .env file
-   - Environment variables might be undefined in API routes
-   - Multiple .env files can cause confusion
-
-#### Immediate Actions [Priority]
-1. [ ] Consolidate Environment Files
-```bash
-# 1. Merge app/.env into root .env
-# 2. Remove app/.env
-# 3. Verify all required variables are in root .env:
-NEXT_PUBLIC_DATABSE_URL=postgresql://...
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
-NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
-REPLICATE_API_TOKEN=r8_...
-NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyD6N...
-GEMINI_API_KEY=AIzaSyAorPf...
-NEXT_PUBLIC_BASE_URL=http://localhost:3000
+Provide analysis in this JSON format:
+{
+    "furniture": [{
+        "type": "exact product type",
+        "style": ["specific style details"],
+        "materials": ["exact materials", "finishes"],
+        "colors": ["specific color names", "finishes"],
+        "dimensions": "precise size or range",
+        "brands": ["similar brand references"],
+        "priceRange": {
+            "min": "estimated minimum price",
+            "max": "estimated maximum price"
+        },
+        "searchTerms": [
+            "exact product keywords",
+            "brand-specific terms",
+            "material-specific terms"
+        ]
+    }],
+    "decor": [{
+        "type": "exact product type",
+        "style": ["specific style details"],
+        "materials": ["exact materials"],
+        "colors": ["specific colors"],
+        "dimensions": "size specifications",
+        "brands": ["similar brands"],
+        "priceRange": {
+            "min": "estimated minimum",
+            "max": "estimated maximum"
+        },
+        "searchTerms": ["specific shopping terms"]
+    }],
+    "structural": {
+        "walls": [{
+            "treatment": "exact wall treatment",
+            "materials": ["specific materials"],
+            "colors": ["exact colors"],
+            "searchTerms": ["shopping keywords"]
+        }],
+        "flooring": [{
+            "type": "exact flooring type",
+            "materials": ["specific materials"],
+            "colors": ["exact colors"],
+            "searchTerms": ["shopping keywords"]
+        }],
+        "windows": [{
+            "type": "exact window type",
+            "treatments": ["specific treatments"],
+            "materials": ["exact materials"],
+            "searchTerms": ["shopping keywords"]
+        }]
+    }
+}`;
 ```
 
-2. [ ] Add Environment Validation
-```javascript
-// Add to analyze-room/route.jsx
-const validateEnvironment = () => {
-    const required = ['GEMINI_API_KEY'];
-    const missing = required.filter(key => !process.env[key]);
-    
-    if (missing.length > 0) {
-        console.error('Missing environment variables:', missing);
-        throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
-    }
-    
-    console.log('Environment validation:', {
-        geminiKeyPresent: !!process.env.GEMINI_API_KEY,
-        keyLength: process.env.GEMINI_API_KEY?.length
-    });
-};
-```
+2. Google Shopping Integration
+```typescript
+interface ShoppingSearch {
+    endpoint: string;
+    parameters: {
+        keyword: string;
+        price: {
+            min?: number;
+            max?: number;
+        };
+        brand?: string[];
+        merchant?: string[];
+        condition?: "new" | "used" | "refurbished";
+        availability?: "in_stock" | "out_of_stock";
+        sort?: "price_low" | "price_high" | "rating";
+    };
+}
 
-3. [ ] Update API Route
-```javascript
-// In analyze-room/route.jsx
-export async function POST(req) {
-    try {
-        // Add environment validation
-        validateEnvironment();
-        
-        console.log('Environment check:', {
-            geminiKeyPresent: !!process.env.GEMINI_API_KEY,
-            baseUrl: process.env.NEXT_PUBLIC_BASE_URL
-        });
-        
-        // ... rest of the code
-    } catch (error) {
-        console.error('Analysis error:', {
-            message: error.message,
-            envError: error.message.includes('environment')
-        });
-        return NextResponse.json({ 
-            error: error.message 
-        }, { 
-            status: 500 
-        });
-    }
+interface ProductResult {
+    title: string;
+    description: string;
+    price: {
+        amount: number;
+        currency: string;
+    };
+    merchant: string;
+    link: string;
+    image: string;
+    rating?: {
+        score: number;
+        count: number;
+    };
 }
 ```
 
-#### Next Steps
-1. [ ] Merge environment files
-2. [ ] Add environment validation
-3. [ ] Restart Next.js server
-4. [ ] Test Gemini integration again
+### Implementation Plan
+1. [ ] Update Gemini Prompt
+   - More detailed product specifications
+   - Include brand references
+   - Add price range estimates
+   - Specific shopping keywords
 
-Would you like me to implement these changes?
+2. [ ] Implement Shopping API Integration
+   - Set up Google Shopping API
+   - Create search parameter mapping
+   - Implement rate limiting
+   - Add result caching
+
+3. [ ] Create Product Matching Algorithm
+   - Match Gemini analysis to products
+   - Filter by price range
+   - Sort by relevance
+   - Group similar items
+
+4. [ ] Update UI
+   - Add shopping results section
+   - Show price comparisons
+   - Include product images
+   - Add "Buy Now" links
+
+### Next Steps
+1. [ ] Update analyze-room endpoint with new prompt
+2. [ ] Set up Google Shopping API credentials
+3. [ ] Create shopping API integration endpoint
+4. [ ] Design product display UI
+
+Would you like me to start with any of these components?
 
 [Previous notes remain below...]

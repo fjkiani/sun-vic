@@ -25,6 +25,7 @@ function CreateNew() {
   const [orgImage,setOrgImage]=useState();
   const {userDetail,setUserDetail}=useContext(UserDetailContext);
   const [error, setError] = useState(null);
+  const [analysis, setAnalysis] = useState(null);
 
   const onHandleInputChange=(value,fieldName)=>{
     if (fieldName === 'image') {
@@ -77,6 +78,7 @@ function CreateNew() {
           formData.designType
         );
         console.log('Analysis completed:', analysisResult);
+        setAnalysis(analysisResult);
       } catch (analysisError) {
         console.error('Analysis failed:', analysisError);
         // Don't throw here - we still want to show the generated image
@@ -194,9 +196,12 @@ function CreateNew() {
           </div>
         </div>
         <CustomLoading loading={loading} />
-        <AiOutputDialog aiImage={aiOutputImage} orgImage={orgImage}
-        closeDialog={()=>setOpenOutputDialog(false)}
-        openDialog={openOutputDialog}
+        <AiOutputDialog 
+            aiImage={aiOutputImage} 
+            orgImage={orgImage}
+            closeDialog={() => setOpenOutputDialog(false)}
+            openDialog={openOutputDialog}
+            analysis={analysis}
         />
     </div>
   )
